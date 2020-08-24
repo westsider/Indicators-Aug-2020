@@ -110,20 +110,20 @@ namespace NinjaTrader.NinjaScript.Indicators
 		private List<int> ibResults = new List<int>();  // 0 inside sd dev 1 > std dev -1 < std dev
 		
 		struct DayTrade {
-		
 			public string todaysDate;
 			public bool inYestRange;
 			public double ibRange;
 			public int ibSize;
+			public double excursion;
+			public double excursionNormalized;
+			public int volume;
+			public int volumeDistrobution;
 			public bool targetHit;
 		}
 		
-		private DayTrade dayTrade = new DayTrade();
-		
+		private DayTrade dayTrade = new DayTrade();	
 		private List<DayTrade> tradeList = new List<DayTrade>(); 
-		
-		//Coordinate point = new Coordinate();
-		
+
         protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -229,6 +229,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 Draw.Dot(this, "targetVwapLow" + CurrentBar, false, 0, vwap, Brushes.Magenta);
                 midVwapTargetHitCountLow += 1;
                 midVwapTargetHitLow = true;
+				dayTrade.targetHit = true;
             }
 		}
 		
@@ -245,9 +246,29 @@ namespace NinjaTrader.NinjaScript.Indicators
 				writeStats();
 				tradeList.Add(dayTrade);
 				
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// ->  CHECK STRUCT <-  /////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+				/// 
+				// MARK: - TODO - only call once
+				string header = "Date, " + "In Y Range, " + "IB Range, " + "IB Distro, " + "Excursion, " + "Excur Distro, " + "IB Volume, "+ "Volume Distro, " + "Result ";
+				Print(header);
+				WriteFile(path: path, newLine: header, header: true); 
 				foreach(DayTrade trade in tradeList) {
-					Print(trade.todaysDate + "\t\tIn Range: " + trade.inYestRange + "\t\tIB Range: " + trade.ibRange + "\t\tIB Relative: " + trade.ibSize + "\t\tTgt Hit: " + trade.targetHit);
+					string newLine = trade.todaysDate + ", " + trade.inYestRange + ", " + trade.ibRange 
+					+ ", " + trade.ibSize + ", " + trade.excursion + ", " + trade.excursionNormalized 
+					+ ", " + trade.volume + ", " + trade.volumeDistrobution 
+					+ ", " + trade.targetHit;
+					Print(newLine);
+					WriteFile(path: path, newLine: newLine, header: false);
 				}
+			
+//				foreach(DayTrade trade in tradeList) {
+//					Print(trade.todaysDate + "\t\tIn Range: " + trade.inYestRange + "\t\tIB Range: " + trade.ibRange 
+//					+ "\t\tIB Distro: " + trade.ibSize + "\t\tExcursion: " + trade.excursion + "\t\tExcur Distro: " + trade.excursionNormalized 
+//					+ "\t\tIB Volume: " + trade.volume + "\t\tVolume Distro: " + trade.volumeDistrobution 
+//					+ "\t\tTgt Hit: " + trade.targetHit);
+//				}
 			}
 		}
 				
@@ -266,6 +287,9 @@ namespace NinjaTrader.NinjaScript.Indicators
 				if (debug) { Draw.Text(this, "highExcursionCounter"+CurrentBar, highExcursionCounter.ToString(), 0, maxHigh + 15 * TickSize, Brushes.Yellow);}
 				highExcursionComplete = true;
 				hiExcursion.Add(excursion);
+				dayTrade.excursion = excursion;
+				double excurRate = eachDayIntoStdDev(list: hiExcursion, day: excursion , debug: false);
+				dayTrade.excursionNormalized = excurRate;
 			}
 			
 			printHistogramD(list: hiExcursion, title: "High Excursion", location: TextPosition.Center, debug: false); 
@@ -344,15 +368,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 		}
 	
         private void countOneIBCloses(bool debug)
-        {
-			
-			// ANOTHER Last Bar attempt if ( CurrentBar < Bars.Count - 2 || CurrentBar == Bars.Count - 1 ) 
-			
-			
-            // at close 
+        { 
+			// ANOTHER Last Bar attempt if ( CurrentBar < Bars.Count - 2 || CurrentBar == Bars.Count - 1 )  
             if (BarsInProgress == 0 && ToTime(Time[0]) == endTime)
-            {
-                
+            { 
                 //if 1 IB break hi
                 if (breaks[0] == 1 )
                 {
@@ -362,8 +381,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     {
                         breakCount[0] += 1;
                     }
-                }
-
+                } 
                 //if 1 IB break low
                 if (breaks[1] == 1 )
                 {
@@ -376,9 +394,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 }
                 // where is close
                 if (debug) { printArray(arr: breakCount, title: "Hi break = Hi close"); }
-            }
-
-
+            } 
         }
 		
 		private void openData() {
@@ -437,19 +453,15 @@ dayTrade.targetHit = false;
 			string thisLine = Time[0].ToShortDateString() + ", " + insideYestRange + ", " + ibRange.ToString() + ", " 
 					+ "Excursion, " + "Volume, " + ", "  + ibRangeo;
 			
-			if ( dataPointCount == 0 ) {
-				string header = "Date, " + "In Y Range, " + "IB Size, "+ "Excursion, " + "Volume, " + "Result ";
-				WriteFile(path: path, newLine: header, header: true); 
-				WriteFile(path: path, newLine: thisLine, header: false);
-			} else {
-				 WriteFile(path: path, newLine: thisLine, header: false);
-			} 
+//			if ( dataPointCount == 0 ) {
+//				string header = "Date, " + "In Y Range, " + "IB Size, "+ "Excursion, " + "Volume, " + "Result ";
+//				WriteFile(path: path, newLine: header, header: true); 
+//				WriteFile(path: path, newLine: thisLine, header: false);
+//			} else {
+//				 WriteFile(path: path, newLine: thisLine, header: false);
+//			} 
 			dataPointCount += 1;
 			printArray(arr: ibResults.ToArray(), title: "IB Results ");
-//			string message = "";
-//            foreach (int i in arr) { message += i.ToString(); }
-//            Print("\n----------> " + title + " <----------\n" + message + "\n-------------------------------------");
-			
 		}
 		
 		private void ibData() {
@@ -468,13 +480,11 @@ dayTrade.targetHit = false;
                         //Draw.Dot(this, "ibMid" + CurrentBar, false, 0, IB_Mid, Brushes.Yellow);
                         ibRange = IB_High - IB_Low;
 						if ( ibRange > MinIB  && ibRange < 50 && !isHoliday) {
-							iBRanges.Add(ibRange); 
-							//if ( range <= 4 ) { Print("Found " + range + " on " + stringDate + " " + Time[0].DayOfWeek.ToString()); }
+							iBRanges.Add(ibRange);  
 						}
 					}
 					if ( openingBar > 0 ) {
-						if (Time[0].Date == DateTime.Today && CurrentDayOnly) {
-                            //drawIBLines();
+						if (Time[0].Date == DateTime.Today && CurrentDayOnly) { 
 							if ( insideYestRange ) {
 								Draw.Text(this, "insideYestRange"+CurrentBar, "inside day", 3, IB_High + 1 * TickSize, FontColor);
                                 drawRectLong(name: "IB", Top: IB_High, Bottom: IB_Low, Length: ibLength, colors: Brushes.DimGray);
@@ -492,12 +502,12 @@ dayTrade.targetHit = false;
 								Draw.Text(this, "insideYestRange"+CurrentBar, "outside", 3, IB_High + 1 * TickSize, FontColor);
                                 drawRectLong(name: "IB", Top: IB_High, Bottom: IB_Low, Length: ibLength, colors: Brushes.Goldenrod);
                             }
-						}
-						
+						} 
 					}
 				}
+				
 				if ( iBRanges.Count > 2 && BarsInProgress == 0)  {
-					int ibRangeEval =  eachDayIntoIBStdDev(list: iBRanges);
+					int ibRangeEval =  eachDayIntoStdDev(list: iBRanges, day: ibRange, debug: false);
 					dayTrade.ibSize = ibRangeEval;
 				}
 			}
@@ -523,17 +533,17 @@ dayTrade.targetHit = false;
 				RTH_Counter += 1; 
 				if ( CurrentBar > 10) {
 					if (Time[0].Date == DateTime.Today && CurrentDayOnly) {
-							RemoveDrawObject("yhigh"+lastBar);
-							Draw.Line(this, "yhigh"+CurrentBar, false, RTH_Counter, Y_High, 0, Y_High, Brushes.Red, DashStyleHelper.Dot, 4);
-							RemoveDrawObject("ylow"+lastBar);
-							Draw.Line(this, "ylow"+CurrentBar, false, RTH_Counter, Y_Low, 0, Y_Low, Brushes.DodgerBlue, DashStyleHelper.Dot, 4); 
-						} 
+						RemoveDrawObject("yhigh"+lastBar);
+						Draw.Line(this, "yhigh"+CurrentBar, false, RTH_Counter, Y_High, 0, Y_High, Brushes.Red, DashStyleHelper.Dot, 4);
+						RemoveDrawObject("ylow"+lastBar);
+						Draw.Line(this, "ylow"+CurrentBar, false, RTH_Counter, Y_Low, 0, Y_Low, Brushes.DodgerBlue, DashStyleHelper.Dot, 4); 
+					} 
 					if ( !CurrentDayOnly) {
-							RemoveDrawObject("yhigh"+lastBar);
-							Draw.Line(this, "yhigh"+CurrentBar, false, RTH_Counter, Y_High, 0, Y_High, Brushes.Red, DashStyleHelper.Dot, 4);
-							RemoveDrawObject("ylow"+lastBar);
-							Draw.Line(this, "ylow"+CurrentBar, false, RTH_Counter, Y_Low, 0, Y_Low, Brushes.DodgerBlue, DashStyleHelper.Dot, 4); 
-						}
+						RemoveDrawObject("yhigh"+lastBar);
+						Draw.Line(this, "yhigh"+CurrentBar, false, RTH_Counter, Y_High, 0, Y_High, Brushes.Red, DashStyleHelper.Dot, 4);
+						RemoveDrawObject("ylow"+lastBar);
+						Draw.Line(this, "ylow"+CurrentBar, false, RTH_Counter, Y_Low, 0, Y_Low, Brushes.DodgerBlue, DashStyleHelper.Dot, 4); 
+					}
 					
 				}
 				if (ToTime(Time[0]) == endTime && RTH_Counter > 0 ) { 
@@ -557,6 +567,12 @@ dayTrade.targetHit = false;
 			// round to 10000 then removed last 3 0's converted to k
 			decimal rounded = Math.Ceiling((decimal) IB_Vol/10000)*10;// * 10;//*10000;
 			volumeRanges.Add(Convert.ToDouble(rounded));
+			dayTrade.volume = Convert.ToInt32( rounded);
+			Print("IS a double " + Convert.ToDouble(rounded) + " === an int" +  Convert.ToInt32( rounded));
+			if ( iBRanges.Count > 2 && BarsInProgress == 0)  {
+					int ibVolEval =  eachDayIntoStdDev(list: volumeRanges, day: Convert.ToDouble(rounded), debug: true);
+					dayTrade.volumeDistrobution = ibVolEval;
+				}
 			if ( debug) { Print(Time[0].ToShortDateString() + " " + IB_Vol +  " Rounded "+ rounded); }
 			IB_Vol = 0.0;
 		}
@@ -595,36 +611,26 @@ dayTrade.targetHit = false;
 			}
 		}
 	
-//		enum PositionDX {
-//			Left, Center, Right;	
-//		}
-		
-		
-		private int eachDayIntoIBStdDev(List<double> list) {
-			//iBSize.Clear();
-			//List<int> iBSize = new List<int>(); 
-			//if ( list.Count < 2 ) { return; }
+		//static void Swap<T>(ref T input1, ref T input2)
+			
+		private int eachDayIntoStdDev<T>(List<T> list, double day, bool debug) {
 			int answer = -999;
-			Dictionary<double, double> Profile = listIntoSortedDict(list: list);
+			Dictionary<double, double> Profile = listIntoSortedDict(list: list as List<double>);
             var mode = Profile.OrderByDescending(x => x.Value).FirstOrDefault().Key;
-            List<double> arr = list;
+            List<double> arr = list as List<double>;
             int avg =  Convert.ToInt32( arr.Average());
             double stdDev = StandardDeviation(values: arr);
             double stDevLo = mode - stdDev;
-            double stDevHi = mode + stdDev; 
-			
-			//foreach( double i in list ) {
-				Print("Called on " + Time[0].ToShortDateString());
-			Print("Comparing " + ibRange + " to hi " + stDevHi + " and low of " + stDevLo + " = ??");
-				if ( ibRange > stDevHi ) {
-					answer = 1 ;
-				} else if ( ibRange < stDevLo ) {
-					answer = -1 ;	
-				} else {
-					answer = 0 ;
-				}
-				
-			//}
+            double stDevHi = mode + stdDev;  
+			if ( stDevLo < 0 ) { stDevLo = 0;} 
+			if ( day > stDevHi ) {
+				answer = 1 ;
+			} else if ( day < stDevLo ) {
+				answer = -1 ;	
+			} else {
+				answer = 0 ;
+			} 
+			if ( debug) {Print("Called T on " + Time[0].ToShortDateString() + " Comparing " + day + " to hi " + stDevHi.ToString("N1") + " and low of " + stDevLo.ToString("N1") + " = " + answer);}
 			return answer;
 		}
 		
